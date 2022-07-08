@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# Copy paste from Gamesennze and Fuzion
+# https://github.com/seksea/gamesneeze
+# https://github.com/LWSS/Fuzion
+
+gdb="gdb" # For using a gdb build such as the cathook one (The one included)
+libraryname="libJInject.so" # The name of the library to patch
+
+function echo_green {
+	echo -e "\\e[32m$*\\e[0m"
+}
+
+function echo_orange {
+	echo -e "\\e[33m$*\\e[0m"
+}
+
+function echo_red {
+	echo -e "\\e[31m$*\\e[0m"
+}
+
+secs_to_human() {
+    if [[ -z ${1} || ${1} -lt 60 ]] ;then
+        min=0 ; secs="${1}"
+    else
+        time_mins=$(echo "scale=2; ${1}/60" | bc)
+        min=$(echo ${time_mins} | cut -d'.' -f1)
+        secs="0.$(echo ${time_mins} | cut -d'.' -f2)"
+        secs=$(echo ${secs}*60|bc|awk '{print int($1+0.5)}')
+    fi
+    echo "Time Elapsed : ${min} minutes and ${secs} seconds."
+}
+
+function load() {
+    processes=$(pidof java)
+    if [ -z "$processes" ]; then
+        echo_red "Game needs to be open before you can inject, exiting..."
+        exit 1
+    fi
+    ps -fp $processes
+    select target_pid in $processes
+    do
+
+    echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope > /dev/null # get the sudo permission
+
+    start=$(date +%s)
+    patchelf --set-soname "$start" "$libraryname"
+    cp "$libraryname" "$start.so"
+
+    echo_orange "Injecting cheat $libraryname into pid $target_pid..."
+    gdbOut=$(
+      $gdb -n -q -batch \
+      -ex "set auto-load safe-path /usr/lib/" \
+      -ex "attach $target_pid" \
+      -ex "set \$dlopen = (void*(*)(char*, int)) dlopen" \
+      -ex "call \$dlopen(\"$(pwd)/$start.so\", 1)" \
+      -ex "detach" \
+      -ex "quit"
+    )
+    # echo $gdbOut
+    lastLine="${gdbOut##*$'\n'}"
+    if [[ "$lastLine" == "detached" ]]; then
+        echo_green "Successfully injected!"
+    elif [[ "$lastLine" == "\$1 = (void *) 0x0" ]]; then
+        echo_red "Injection failed, make sure you have compiled."
+    else
+        echo_orange "Unknown error during injection progress."
+    fi
+    rm "$start.so"
+
+    secs_to_human "$(($(date +%s) - ${start}))"
+    break
+    done
+}
+
+function build {
+    if test -z "$CXX"
+    then
+        CXX=g++
+    fi
+
+    cmake . || exit 1
+
+    if ! hash patchelf 2>/dev/null; then
+        echo_red -e "You need to install the \"patchelf\" command!\nUse your package manager to install it, or get source here:\nhttps://github.com/NixOS/patchelf"
+        exit 1
+    fi
+
+    make -j"$(grep -c "^processor" /proc/cpuinfo)" "$@" || exit 1
+    strip -s -v "$libraryname"
+
+    echo "Build Completed."
+}
+
+while [[ $# -gt 0 ]]
+do
+keys="$1"
+case $keys in
+    -l|--load)
+        load
+        shift
+        ;;
+    -b|--build)
+        build
+        shift
+        ;;
+    *)
+        echo "
+Neko:
+    -l, --load    Load nekosense into CS:GO
+    -b, --build   Build nekosense
+"
+        exit
+        ;;
+esac
+done
