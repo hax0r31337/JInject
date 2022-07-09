@@ -40,7 +40,7 @@ function load() {
     select target_pid in $processes
     do
 
-    echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope > /dev/null # get the sudo permission
+    echo "0" | sudo tee /proc/sys/kernel/yama/ptrace_scope # get the sudo permission
 
     start=$(date +%s)
     patchelf --set-soname "$start" "$libraryname"
@@ -49,7 +49,7 @@ function load() {
     echo_orange "Injecting cheat $libraryname into pid $target_pid..."
     gdbOut=$(
       $gdb -n -q -batch \
-      -ex "set auto-load safe-path /usr/lib/" \
+      -ex "set auto-load safe-path /" \
       -ex "attach $target_pid" \
       -ex "set \$dlopen = (void*(*)(char*, int)) dlopen" \
       -ex "call \$dlopen(\"$(pwd)/$start.so\", 1)" \
@@ -63,6 +63,7 @@ function load() {
     elif [[ "$lastLine" == "\$1 = (void *) 0x0" ]]; then
         echo_red "Injection failed, make sure you have compiled."
     else
+        echo $gdbOut
         echo_orange "Unknown error during injection progress."
     fi
     rm "$start.so"

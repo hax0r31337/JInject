@@ -5,6 +5,7 @@
 #include <jvmti.h>
 
 struct JvmtiHandle {
+  static jobject transformerManager;
   static void retransformClasses(JNIEnv *jnienv, jvmtiEnv *retransformerEnv,
                           jobjectArray classes);
   static void JNICALL vmClassFileLoadHook(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
