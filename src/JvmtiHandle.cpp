@@ -6,6 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+static jobject transformerManager = nullptr;
+
+void JvmtiHandle::setTransformerManager(jobject transformerManagerIn) {
+  transformerManager = transformerManagerIn;
+}
+
 void JvmtiHandle::retransformClasses(JNIEnv *jnienv, jvmtiEnv *retransformerEnv,
                         jobjectArray classes) {
   jsize numClasses = jnienv->GetArrayLength(classes);
@@ -25,11 +31,10 @@ void JNICALL JvmtiHandle::vmClassFileLoadHook(
     jobject loader, const char *name, jobject protection_domain,
     jint class_data_len, const unsigned char *class_data,
     jint *new_class_data_len, unsigned char **new_class_data) {
-  jclass transformerManagerCls =
-      jniEnv->FindClass("me/kotone/jisdk/TransformerManager");
-  if (!transformerManagerCls) {
+  if (transformerManager == nullptr) {
     return;
   }
+  jclass transformerManagerCls = jniEnv->GetObjectClass(transformerManager);
   jmethodID transformMethod = jniEnv->GetMethodID(transformerManagerCls, "transform", "(Ljava/lang/String;[B)[B");
 
   jbyteArray classFileBufferObject = jniEnv->NewByteArray(class_data_len);
@@ -38,7 +43,7 @@ void JNICALL JvmtiHandle::vmClassFileLoadHook(
                            /* The sign cast is safe. The const cast is dumb. */
   jniEnv->SetByteArrayRegion(classFileBufferObject, 0,
                                 class_data_len, typedBuffer);
-  jbyteArray transformResult = (jbyteArray)jniEnv->CallObjectMethod(JvmtiHandle::transformerManager, transformMethod, jniEnv->NewStringUTF(name), classFileBufferObject);
+  jbyteArray transformResult = (jbyteArray)jniEnv->CallObjectMethod(transformerManager, transformMethod, jniEnv->NewStringUTF(name), classFileBufferObject);
   if (transformResult == NULL) {
     return;
   }
@@ -51,4 +56,13 @@ void JNICALL JvmtiHandle::vmClassFileLoadHook(
   *new_class_data_len = transformedBufferSize;
   
   std::cout << name << std::endl;
+}
+
+void JvmtiHandle::printStackTrace(JNIEnv *jniEnv) {
+  jthrowable exception = jniEnv->ExceptionOccurred();
+  jniEnv->ExceptionClear();
+  jclass throwableCls = jniEnv->FindClass("java/lang/Throwable");
+  jmethodID printStackTrace =
+      jniEnv->GetMethodID(throwableCls, "printStackTrace", "()V");
+  jniEnv->CallVoidMethod(exception, printStackTrace);
 }

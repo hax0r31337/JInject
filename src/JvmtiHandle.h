@@ -5,7 +5,7 @@
 #include <jvmti.h>
 
 struct JvmtiHandle {
-  static jobject transformerManager;
+  static void setTransformerManager(jobject transformerManagerIn);
   static void retransformClasses(JNIEnv *jnienv, jvmtiEnv *retransformerEnv,
                           jobjectArray classes);
   static void JNICALL vmClassFileLoadHook(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
@@ -15,4 +15,5 @@ struct JvmtiHandle {
                                    const unsigned char *class_data,
                                    jint *new_class_data_len,
                                    unsigned char **new_class_data);
+  static void printStackTrace(JNIEnv *jniEnv);
 };

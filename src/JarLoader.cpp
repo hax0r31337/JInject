@@ -43,30 +43,23 @@ bool JarLoader::tryInvokeMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jobject classL
   jclass attributesCls = jniEnv->GetObjectClass(mainAttributes);
 
   jmethodID getValue = jniEnv->GetMethodID(attributesCls, "getValue", "(Ljava/lang/String;)Ljava/lang/String;");
-  jstring emptyString = jniEnv->NewStringUTF("");
-  jclass stringCls = jniEnv->FindClass("java/lang/String");
-  jmethodID equals = jniEnv->GetMethodID(stringCls, "equals", "(Ljava/lang/Object;)Z");
 
   jstring value = (jstring)jniEnv->CallObjectMethod(
       mainAttributes, getValue, jniEnv->NewStringUTF("JIAgent-Class"));
-  jboolean equalResult = jniEnv->CallBooleanMethod(value, equals, emptyString);
-  if (!equalResult) {
+  if (value != NULL && jniEnv->GetStringLength(value) != 0) {
     jclass klass = JarLoader::getClass(jniEnv, classLoader, value);
     if (klass == nullptr) {
-      std::cout << "[ERROR] Failed to load defined class ("
-                << jniEnv->GetStringUTFChars(value, 0) << ")" << std::endl;
+      std::cout << "[ERROR] Failed to load defined class (JIAgent)" << std::endl;
       return false;
     }
-    return JarLoader::callJIAgentMain(jniEnv, jvmtiEnv, klass);
+    return JarLoader::callJIAgentMain(jniEnv, jvmtiEnv, classLoader, klass);
   }
 
   value = (jstring)jniEnv->CallObjectMethod(mainAttributes, getValue, jniEnv->NewStringUTF("Main-Class"));
-  equalResult = jniEnv->CallBooleanMethod(value, equals, emptyString);
-  if (!equalResult) {
+  if (value != NULL && jniEnv->GetStringLength(value) != 0) {
     jclass klass = JarLoader::getClass(jniEnv, classLoader, value);
     if (klass == nullptr) {
-      std::cout << "[ERROR] Failed to load defined class ("
-                << jniEnv->GetStringUTFChars(value, 0) << ")" << std::endl;
+      std::cout << "[ERROR] Failed to load defined class (Main)" << std::endl;
       return false;
     }
     return JarLoader::callMain(jniEnv, klass);
@@ -76,7 +69,7 @@ bool JarLoader::tryInvokeMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jobject classL
   return false;
 }
 
-bool JarLoader::callJIAgentMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jclass klass) {
+bool JarLoader::callJIAgentMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jobject classLoader, jclass klass) {
   jvmtiCapabilities desiredCapabilities;
   jint result = jvmtiEnv->GetCapabilities(&desiredCapabilities);
   if (result != JVMTI_ERROR_NONE) {
@@ -102,19 +95,19 @@ bool JarLoader::callJIAgentMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jclass klass
   jvmtiEnv->SetEventNotificationMode(JVMTI_ENABLE,
                                   JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, NULL);
   
-  jclass transformerManagerCls = jniEnv->FindClass("me/kotone/jisdk/TransformerManager");
+  jclass transformerManagerCls = JarLoader::getClass(jniEnv, classLoader, jniEnv->NewStringUTF("me.kotone.jisdk.TransformerManager"));
   if (!transformerManagerCls) {
     std::cout << "[ERROR] No JISDK class found" << std::endl;
     return false;
   }
   jmethodID transformerManagerInit = jniEnv->GetMethodID(transformerManagerCls, "<init>", "()V");
   jobject instance = jniEnv->NewObject(transformerManagerCls, transformerManagerInit);
-  JvmtiHandle::transformerManager = instance;
+  JvmtiHandle::setTransformerManager(instance);
 
   jmethodID mainMethod =
       jniEnv->GetStaticMethodID(klass, "main", "(Lme/kotone/jisdk/TransformerManager;)[Ljava/lang/Class;");
   if (!mainMethod || jniEnv->ExceptionCheck()) {
-    jniEnv->ExceptionClear();
+    JvmtiHandle::printStackTrace(jniEnv);
     std::cout << "[ERROR] No main method found" << std::endl;
     return false; // MethodNotFoundException
   }
@@ -131,7 +124,7 @@ bool JarLoader::callMain(JNIEnv *jniEnv, jclass klass) {
   jmethodID mainMethod =
       jniEnv->GetStaticMethodID(klass, "main", "([Ljava/lang/String;)V");
   if (!mainMethod || jniEnv->ExceptionCheck()) {
-    jniEnv->ExceptionClear();
+    JvmtiHandle::printStackTrace(jniEnv);
     std::cout << "[ERROR] No main method found" << std::endl;
     return false; // MethodNotFoundException
   }
@@ -146,8 +139,8 @@ jclass JarLoader::getClass(JNIEnv *jniEnv, jobject classLoader, jstring name) {
       classLoaderCls, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
 
   jclass klass = (jclass)jniEnv->CallObjectMethod(classLoader, loadClass, name);
-  if (!klass || jniEnv->ExceptionCheck()) {
-    jniEnv->ExceptionClear();
+  if (jniEnv->ExceptionCheck()) {
+    JvmtiHandle::printStackTrace(jniEnv);
     return nullptr; // ClassNotFoundException
   }
   return klass;

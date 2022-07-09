@@ -42,7 +42,6 @@ void MainThread() {
       env->GetStaticMethodID(JOptionPane, "showMessageDialog",
                              "(Ljava/awt/Component;Ljava/lang/Object;)V");
 
-    std::cout << "[ERROR] Failed to obtain JvmtiEnv!" << std::endl;
   jobject fileChoosed = FileChooser::ChooseFile(env);
   if (fileChoosed == nullptr) {
     env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
@@ -69,7 +68,6 @@ void MainThread() {
 
 /* Entrypoint to the Library. Called when loading */
 int __attribute__((constructor)) Startup() {
-  exit(0);
   std::thread mainThread(MainThread);
   // The root of all suffering is attachment
   // Therefore our little buddy must detach from this realm.

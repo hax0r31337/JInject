@@ -17,7 +17,7 @@ struct JarLoader {
   static bool tryInvokeMain(JNIEnv *env, jvmtiEnv *jvmtiEnv, jobject classLoader, jobject file);
 
 private:
-  static bool callJIAgentMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jclass klass);
+  static bool callJIAgentMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jobject classLoader, jclass klass);
   static bool callMain(JNIEnv *jniEnv, jclass klass);
   static jclass getClass(JNIEnv *jniEnv, jobject classLoader, jstring name);
 };

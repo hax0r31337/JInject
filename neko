@@ -40,7 +40,7 @@ function load() {
     select target_pid in $processes
     do
 
-    echo "0" | sudo tee /proc/sys/kernel/yama/ptrace_scope # get the sudo permission
+    echo "0" | sudo tee /proc/sys/kernel/yama/ptrace_scope > /dev/null # get the sudo permission
 
     start=$(date +%s)
     patchelf --set-soname "$start" "$libraryname"
@@ -56,14 +56,13 @@ function load() {
       -ex "detach" \
       -ex "quit"
     )
-    # echo $gdbOut
+    echo $gdbOut
     lastLine="${gdbOut##*$'\n'}"
     if [[ "$lastLine" == "detached" ]]; then
         echo_green "Successfully injected!"
     elif [[ "$lastLine" == "\$1 = (void *) 0x0" ]]; then
         echo_red "Injection failed, make sure you have compiled."
     else
-        echo $gdbOut
         echo_orange "Unknown error during injection progress."
     fi
     rm "$start.so"
