@@ -37,6 +37,10 @@ bool JarLoader::tryInvokeMain(JNIEnv *jniEnv, jvmtiEnv *jvmtiEnv, jobject classL
 
   jmethodID getManifest = jniEnv->GetMethodID(jarInputStreamCls, "getManifest", "()Ljava/util/jar/Manifest;");
   jobject manifest = jniEnv->CallObjectMethod(jarInputStream, getManifest);
+  if (manifest == NULL || manifest == nullptr) {
+    std::cout << "[ERROR] No Manifest found" << std::endl;
+    return false;
+  }
   jclass manifestCls = jniEnv->GetObjectClass(manifest);
   jmethodID getMainAttributes = jniEnv->GetMethodID(manifestCls, "getMainAttributes", "()Ljava/util/jar/Attributes;");
   jobject mainAttributes = jniEnv->CallObjectMethod(manifest, getMainAttributes);
