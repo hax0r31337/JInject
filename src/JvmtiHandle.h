@@ -1,6 +1,9 @@
 #pragma once
 
+#include "JInject.h"
+#if OS_LINUX
 #include "jni_md.h"
+#endif
 #include <jni.h>
 #include <jvmti.h>
 

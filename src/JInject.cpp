@@ -1,6 +1,5 @@
 #include "FileChooser.h"
 #include "JarLoader.h"
-#include "jni_md.h"
 #include "JvmtiHandle.h"
 #include <cstdlib>
 #include <cstring>
@@ -8,8 +7,12 @@
 #include <jni.h>
 #include <jvmti.h>
 #include <thread>
-
-#define OS_LINUX true
+#include "JInject.h"
+#if OS_LINUX
+#include "jni_md.h"
+#else
+#include <windows.h>
+#endif
 
 void MainThread() {
   JavaVM *jvm = nullptr;
@@ -78,5 +81,19 @@ int __attribute__((constructor)) Startup() {
 }
 
 #else
-// TODO: winapi DLLMain
+PVOID WINAPI hook(PVOID arg) {
+  MainThread();
+}
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
+  DisableThreadLibraryCalls(hModule);
+
+  switch (dwReason) {
+  case DLL_PROCESS_ATTACH:
+    CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)hook, NULL, 0, NULL);
+    break;
+  }
+
+  return TRUE;
+}
 #endif

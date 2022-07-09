@@ -1,6 +1,9 @@
 #include "JvmtiHandle.h"
 #include "jni.h"
+#include "JInject.h"
+#if OS_LINUX
 #include "jni_md.h"
+#endif
 #include <cstddef>
 #include <iostream>
 #include <stdlib.h>
