@@ -1,4 +1,4 @@
-#include "jvmtiHandle.h"
+#include "JvmtiHandle.h"
 #include <stdlib.h>
 #include <string.h>
 

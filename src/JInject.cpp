@@ -1,5 +1,7 @@
+#include "FileChooser.h"
+#include "JarLoader.h"
 #include "jni_md.h"
-#include "jvmtiHandle.h"
+#include "JvmtiHandle.h"
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -9,13 +11,10 @@
 
 #define OS_LINUX true
 
-JavaVM *jvm;
-JNIEnv *env;
-jvmtiEnv *jvmti;
-
 void MainThread() {
-  jvm = nullptr;
-  env = nullptr;
+  JavaVM *jvm = nullptr;
+  JNIEnv *env = nullptr;
+  jvmtiEnv *jvmti = nullptr;
 
   jsize count;
   if (JNI_GetCreatedJavaVMs(&jvm, 1, &count) != JNI_OK || count == 0)
@@ -62,8 +61,25 @@ void MainThread() {
   jmethodID showMessageDialog =
       env->GetStaticMethodID(JOptionPane, "showMessageDialog",
                              "(Ljava/awt/Component;Ljava/lang/Object;)V");
-  env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
-                              env->NewStringUTF("JVMTi Obtained!"));
+
+  jobject fileChoosed = FileChooser::ChooseFile(env);
+  if (fileChoosed == nullptr) {
+    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
+                                env->NewStringUTF("Action cancelled"));
+    return;
+  }
+  
+  jobject urlClassLoader = JarLoader::loadJar(env, fileChoosed);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
+                                env->NewStringUTF("Exception occur"));
+  }
+  bool invokeResult = JarLoader::tryInvokeMain(env, jvmti, urlClassLoader, fileChoosed);
+  if (!invokeResult) {
+    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
+                                env->NewStringUTF("Unable to invoke main class"));
+  }
 
   // jvm->DetachCurrentThread();
 }
@@ -84,7 +100,3 @@ int __attribute__((constructor)) Startup() {
 #else
 // TODO: winapi DLLMain
 #endif
-
-/* Called when un-injecting the library */
-void __attribute__((destructor)) Shutdown() {
-}
