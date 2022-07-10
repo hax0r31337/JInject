@@ -9,14 +9,14 @@
 #include <thread>
 #include "JInject.h"
 #if OS_LINUX
-#include "jni_md.h"
+#include <jni_md.h>
 #else
 #include <windows.h>
 #endif
 
 void MainThread() {
   JavaVM *jvm = nullptr;
-  JNIEnv *env = nullptr;
+  JNIEnv *jniEnv = nullptr;
   jvmtiEnv *jvmti = nullptr;
 
   jsize count;
@@ -26,9 +26,9 @@ void MainThread() {
   }
 
   // obtain JniEnv pointer
-  jint result = jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
+  jint result = jvm->GetEnv((void **)&jniEnv, JNI_VERSION_1_6);
   if (result == JNI_EDETACHED)
-    result = jvm->AttachCurrentThread((void **)&env, nullptr);
+    result = jvm->AttachCurrentThread((void **)&jniEnv, nullptr);
   if (result != JNI_OK) {
     std::cout << "[ERROR] Failed to obtain JNIEnv!" << std::endl;
     return;
@@ -40,28 +40,23 @@ void MainThread() {
     return;
   }
 
-  jclass JOptionPane = env->FindClass("javax/swing/JOptionPane");
+  jclass JOptionPane = jniEnv->FindClass("javax/swing/JOptionPane");
   jmethodID showMessageDialog =
-      env->GetStaticMethodID(JOptionPane, "showMessageDialog",
+      jniEnv->GetStaticMethodID(JOptionPane, "showMessageDialog",
                              "(Ljava/awt/Component;Ljava/lang/Object;)V");
 
-  jobject fileChoosed = FileChooser::ChooseFile(env);
+  jobject fileChoosed = FileChooser::ChooseFile(jniEnv);
   if (fileChoosed == nullptr) {
-    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
-                                env->NewStringUTF("Action cancelled"));
+    jniEnv->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
+                                jniEnv->NewStringUTF("Action cancelled"));
     return;
   }
   
-  jobject urlClassLoader = JarLoader::loadJar(env, fileChoosed);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
-                                env->NewStringUTF("Exception occur"));
-  }
-  bool invokeResult = JarLoader::tryInvokeMain(env, jvmti, urlClassLoader, fileChoosed);
+  JarLoader::loadJar(jniEnv, jvmti, fileChoosed);
+  bool invokeResult = JarLoader::tryInvokeMain(jniEnv, jvmti, fileChoosed);
   if (!invokeResult) {
-    env->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
-                                env->NewStringUTF("Unable to invoke main class"));
+    jniEnv->CallStaticObjectMethod(JOptionPane, showMessageDialog, NULL,
+                                jniEnv->NewStringUTF("Unable to invoke main class"));
   }
 
   // jvm->DetachCurrentThread();

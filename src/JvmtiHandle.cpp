@@ -2,7 +2,7 @@
 #include "jni.h"
 #include "JInject.h"
 #if OS_LINUX
-#include "jni_md.h"
+#include <jni_md.h>
 #endif
 #include <cstddef>
 #include <iostream>
@@ -57,8 +57,6 @@ void JNICALL JvmtiHandle::vmClassFileLoadHook(
 
   *new_class_data = resultBuffer;
   *new_class_data_len = transformedBufferSize;
-  
-  std::cout << name << std::endl;
 }
 
 void JvmtiHandle::printStackTrace(JNIEnv *jniEnv) {
